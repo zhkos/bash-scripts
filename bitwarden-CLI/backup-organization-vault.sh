@@ -57,7 +57,8 @@ function bw_logout {
 function bw_get_json {
     OUTPUT_EX="$EXPORT_OUTPUT_PREFIX$TIMESTAMP.encrypted"
     bw export "$BW_PASS" --organizationid "$ORG_ID" --raw --format json \
-    | openssl enc -aes-256-cbc -pbkdf2 -salt -k "$BW_PASS" -out "/vault/vaultwarden/backup/$OUTPUT_EX" -iter "$ITER_VALUE" && printf "Success, encrypted export aes-256-cbc\n"
+    | openssl enc -aes-256-cbc -pbkdf2 -salt -k "$BW_PASS" -out "/vault/vaultwarden/backup/$OUTPUT_EX" -iter "$ITER_VALUE" \
+    && printf "Success, encrypted export aes-256-cbc\n"
 }
 
 function bw_pg_dump {

@@ -49,7 +49,8 @@ function bw_connect {
 
 function bw_get_json {
     bw export --raw "$BW_PASS" --format json \
-    | openssl enc -aes-256-cbc -pbkdf2 -salt -k "$BW_PASS" -out "${PATH_TO_BACKUP:?}$OUTPUT_EX" -iter "$ITER_VALUE"
+    | openssl enc -aes-256-cbc -pbkdf2 -salt -k "$BW_PASS" -out "${PATH_TO_BACKUP:?}$OUTPUT_EX" -iter "$ITER_VALUE" \
+    && printf "Success, encrypted export aes-256-cbc\n"
     bw logout --response
     unset NODE_EXTRA_CA_CERTS
     unset BW_SESSION
