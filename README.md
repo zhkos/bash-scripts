@@ -1,0 +1,1 @@
+This repository contains various bash scripts that do not deserve separate repositories
