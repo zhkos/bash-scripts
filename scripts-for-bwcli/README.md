@@ -1,4 +1,5 @@
-For these scripts to work bw_cli needed
+#### For these scripts to work bw_cli needed
+*********
 
 * backup-personal-vault.sh
 
