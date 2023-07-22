@@ -10,4 +10,3 @@ Also check variables in scripts
 This script can backup organization vault by bw_cli and pg_dump
 Also check variables in scripts
 
-0 3 * * * /vault/backup-personal-vault.sh
