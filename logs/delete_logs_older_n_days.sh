@@ -1,5 +1,4 @@
 #!/bin/bash
-
 #set -x
 set -e
 
@@ -7,12 +6,10 @@ if [ -z "$1" ]; then
     echo "no path to dir var"
     exit 1
 fi
-
 if [ -z "$2" ]; then
     echo "no days ago var"
     exit 1
 fi
-
 
 days_ago="$2"
 logs_directory="$1"
