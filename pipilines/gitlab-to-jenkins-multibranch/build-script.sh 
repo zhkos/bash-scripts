@@ -1,0 +1,141 @@
+#!/bin/bash
+set -e
+#set -x
+
+function get_next_build_number {
+  printf "Get next build number for: %s/job/%s .\n" "${JOB_URL}" "${CI_COMMIT_REF_NAME}" >&2
+  curl -X GET --show-error --silent --retry 3 --retry-delay 5 \
+  "${JOB_URL}/job/${CI_COMMIT_REF_NAME}/api/json" \
+  --user "${JENKINS_USER}:${BUILD_TOKEN}" | jq -r ".nextBuildNumber"
+}
+
+function get_last_build_number {
+  printf "Get last build number for: %s/job/%s .\n" "${JOB_URL}" "${CI_COMMIT_REF_NAME}" >&2
+  curl -X GET --show-error --silent --retry 3 --retry-delay 5 \
+  "${JOB_URL}/job/${CI_COMMIT_REF_NAME}/api/json" \
+  --user "${JENKINS_USER}:${BUILD_TOKEN}" | jq -r ".lastBuild.number"
+}
+
+function get_build_status() {
+  build_number=$1
+  curl -X GET --show-error --silent --retry 3 --retry-delay 5 \
+  "${JOB_URL}/job/${CI_COMMIT_REF_NAME}/${build_number}/api/json" \
+  --user "${JENKINS_USER}:${BUILD_TOKEN}" | jq -r ".result"
+ }
+
+function trigger_build_job() {
+  build_params=$1
+  printf "Trigger build job.\n" >&2
+  curl -X POST --show-error --silent --retry 3 --retry-delay 5 \
+  "${JOB_URL}/job/${CI_COMMIT_REF_NAME}/buildWithParameters?${build_params}" \
+  --user "${JENKINS_USER}:${BUILD_TOKEN}"
+}
+
+function trigger_all_build_job_indexing {
+  printf "Trigger branch indexing.\n" >&2
+  curl -X POST --show-error --silent --retry 3 --retry-delay 5 \
+  "${JOB_URL}/build" \
+  --user "${JENKINS_USER}:${BUILD_TOKEN}"
+}
+
+function polling_job_result() {
+  build_number=$1
+  poll_max_attempts=$2
+  requests_interval=$3
+  counter_tries=0
+
+  build_status="null"
+  while [[ "${build_status}" == "null" && "${counter_tries}" -lt "${poll_max_attempts}"  ]]
+  do
+    (( counter_tries+=1 ))
+    sleep "${requests_interval}"
+    build_status=$(get_build_status "${build_number}")
+    printf "...poll job result...%s...%s\n" "${counter_tries}" "${build_status}"
+  done
+  if [[ "${counter_tries}" -eq "${poll_max_attempts}" ]]; then {
+     printf "Too many attempts to poll job!Exit.\nCheck job in Jenkins.\n" && exit 1;
+  }
+  fi
+}
+
+#main
+printf "\e==================================CHECK==================================\n"
+[[ ! -x "$(command -v jq)" ]] && { printf "jq is not installed or not available in PATH.\n"; exit 1; }
+[[ ! -x "$(command -v curl)" ]] && { printf "curl is not installed or not available in PATH.\n"; exit 1; }
+[[ ! -x "$(command -v bash)" ]] && { printf "bash is not installed or not available in PATH.\n"; exit 1; }
+#vars from gitlab-ci.yml and ci/cd variables
+[[ -z "${JENKINS_USER}" ]] && { printf "The environment variable JENKINS_USER is not set.\n"; exit 1; }
+[[ -z "${BUILD_TOKEN}" ]] && { printf "The environment variable BUILD_TOKEN is not set.\n"; exit 1; }
+[[ -z "${POLL_MAX_ATTEMPTS}" ]] && { printf "The environment variable POLL_MAX_ATTEMPTS is not set.\n"; exit 1; }
+[[ -z "${BUILD_PARAMS}" ]] && { printf "The environment variable BUILD_PARAMS is not set.\n"; exit 1; }
+[[ -z "${REQUESTS_INTERVAL}" ]] && { printf "The environment variable REQUESTS_INTERVAL is not set.\n"; exit 1; }
+[[ -z "${JOB_URL}" ]] && { printf "The environment variable JOB_URL is not set.\n"; exit 1; }
+[[ -z "${DELAY_FIRST_START}" ]] && { printf "The environment variable DELAY_FIRST_START is not set.\n"; exit 1; }
+[[ "${CI_PIPELINE_SOURCE}" == "merge_request_event" && -z "${DELAY_FOR_MERGE}" ]] && { printf "The environment variable DELAY_FOR_MERGE is not set.\n"; exit 1; }
+printf "All vars and packages set.OK.\n"
+
+if [[ "${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}" == "${CI_DEFAULT_BRANCH}" ]]; then
+  #params for merge job
+  sleep "${DELAY_FOR_MERGE}"
+  BUILD_PARAMS="${BUILD_PARAMS}"
+else
+  #params for commit_job
+  BUILD_PARAMS="${BUILD_PARAMS}"
+fi
+
+
+printf "\e==================================PARAM==================================\n"
+printf "Build triggered by %s\n" "${GITLAB_USER_LOGIN}"
+printf "Job URL:%s\n" "${JOB_URL}"
+printf "Branch: %s\n" "${CI_COMMIT_REF_NAME}"
+printf "Poll job max tries:%s\n" "${POLL_MAX_ATTEMPTS}"
+printf "Requests interval:%s\n" "${REQUESTS_INTERVAL}"
+printf "Delay first start:%s\n" "${DELAY_FIRST_START}"
+[[ -z "${DELAY_FOR_MERGE}" ]] || printf "Delay for merge:%s\n" "${DELAY_FOR_MERGE}"
+printf "Params for build: %s\n" "${BUILD_PARAMS}"
+printf "\e==================================BUILD==================================\n"
+
+# catch first run when pipilene not exists
+if  get_next_build_number > /dev/null 2>&1 ; then
+  {
+  printf "Pipeline exists in Jenkins.Trigger build.\n"
+  BUILD_NUMBER=$(get_next_build_number)
+  [[ -z "${BUILD_NUMBER}" ]] && { printf "BUILD_NUMBER is empty.\n"; exit 1; }
+  printf "BUILD NUMBER: %s\n" "${BUILD_NUMBER}"
+  trigger_build_job "${BUILD_PARAMS}"
+  polling_job_result "${BUILD_NUMBER}" "${POLL_MAX_ATTEMPTS}" "${REQUESTS_INTERVAL}" 
+  BUILD_STATUS=$(get_build_status "${BUILD_NUMBER}")
+
+  } else {
+
+  # start branch indexing
+  printf "Pipeline not exists in Jenkins.Trigger branch indexing.\n"
+  trigger_all_build_job_indexing
+  sleep "${DELAY_FIRST_START}"
+  BUILD_NUMBER=$(get_last_build_number)
+  [[ -z "${BUILD_NUMBER}" ]] && { printf "BUILD_NUMBER is empty.\n"; exit 1; }
+  printf "BUILD NUMBER: %s\n" "${BUILD_NUMBER}" 
+  polling_job_result "${BUILD_NUMBER}" "${POLL_MAX_ATTEMPTS}" "${REQUESTS_INTERVAL}"
+  BUILD_STATUS=$(get_build_status "${BUILD_NUMBER}")
+
+  # start second job with non-default parameters
+  get_next_build_number > /dev/null 2>&1 || exit 1
+  printf "Try to start second job.\n"
+  BUILD_NUMBER=$(get_next_build_number)
+  [[ -z "${BUILD_NUMBER}" ]] && { printf "BUILD_NUMBER is empty.\n"; exit 1; }
+  printf "BUILD NUMBER: %s\n" "${BUILD_NUMBER}"
+  trigger_build_job "${BUILD_PARAMS}"
+  polling_job_result "${BUILD_NUMBER}" "${POLL_MAX_ATTEMPTS}" "${REQUESTS_INTERVAL}" 
+  BUILD_STATUS=$(get_build_status "${BUILD_NUMBER}")
+  }
+fi
+
+
+[[ "${BUILD_STATUS}" == "ABORTED" ]] && printf "Build was ABORTED by Jenkins.\n"
+[[ "${BUILD_STATUS}" == "FAILURE" ]] && printf "Build was FAILED in Jenkins.\n"
+[[ "${BUILD_STATUS}" != "ABORTED" && "${BUILD_STATUS}" != "SUCCESS" && "${BUILD_STATUS}" != "FAILURE" ]] && printf "Unexpected build status.Check Jenkins job.\n"
+printf "\e==================================FINAL==================================\n"
+printf "BUILD NUMBER: %s\n" "${BUILD_NUMBER}"
+printf "FINAL BUILD STATUS: %s\n" "${BUILD_STATUS}"
+printf "\e=========================================================================\n"
+[[ "${BUILD_STATUS}" == "SUCCESS" ]] && exit 0 || exit 1

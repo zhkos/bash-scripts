@@ -1,0 +1,35 @@
+pipeline {
+    agent {
+        label 'build'
+    }
+    options {
+        buildDiscarder logRotator(daysToKeepStr: '10', numToKeepStr: '10', artifactDaysToKeepStr: '', artifactNumToKeepStr: '')
+    }
+    parameters {
+        booleanParam(defaultValue: true, name: 'SOME_PARAM', description: '')
+        booleanParam(defaultValue: true, name: 'SOME_PARAM2', description: '')
+    }
+    stages {
+        stage('Build: Maven') {
+             steps {
+                withMaven {
+                 sh '''
+                    mvn clean deploy \
+                   -DskipTests=${SOME_PARAM} \
+                   -e \
+                   -Dbranch.name=${BRANCH_NAME} \
+                   -Dbuild.number=${BUILD_NUMBER} \
+                   -Dbuild.date=${BUILD_TIMESTAMP} \
+                   -DskipDocker=${SOME_PARAM2} \
+                    '''
+                }
+             }
+        }
+    }
+    post {
+        always {            
+        cleanWs()
+        }
+    }
+
+}

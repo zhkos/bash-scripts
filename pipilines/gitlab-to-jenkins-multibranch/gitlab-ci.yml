@@ -1,0 +1,43 @@
+stages:
+  - build_project
+
+
+commit_job:
+  stage: build_project
+  variables:
+    JOB_URL: ""
+    #build params
+    BUILD_PARAMS: ""
+    #script params
+    POLL_MAX_ATTEMPTS: "40"
+    REQUESTS_INTERVAL: "15"
+    DELAY_FIRST_START: "50"
+  tags:
+    - test
+  script:
+    - apk update && apk add curl bash jq > /dev/null 2>&1
+    - chmod +x ./.ci/build-script.sh > /dev/null 2>&1
+    - ./.ci/build-script.sh
+  rules:
+    - if: $CI_PIPELINE_SOURCE != "merge_request_event" && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
+
+
+merge_job:
+  stage: build_project
+  variables:
+    JOB_URL: ""
+    #build params
+    BUILD_PARAMS: ""
+    #script params
+    POLL_MAX_ATTEMPTS: "50"
+    REQUESTS_INTERVAL: "20"
+    DELAY_FOR_MERGE: "60"
+    DELAY_FIRST_START: "50"
+  tags:
+    - test
+  script:
+    - apk update && apk add curl bash jq > /dev/null 2>&1
+    - chmod +x ./.ci/build-script.sh > /dev/null 2>&1
+    - ./.ci/build-script.sh
+  rules:
+     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH
