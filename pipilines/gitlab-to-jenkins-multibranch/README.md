@@ -1,5 +1,9 @@
 My script for a multi-branch pipeline in Jenkins that is triggered by GitLab and pulls a job in Jenkins
 
+#### How it works
+1. If the pipeline in Jenkins already exists, it determines the next build number and triggers a build with that number. Then, it polls the status of the pipeline in Jenkins, waiting to receive a SUCCESS status.
+2. If the pipeline in Jenkins does not exist, it first triggers branch indexing. Then, it polls not the next build, but the previous one (i.e., the first) with default build parameters from the Jenkinsfile. After that, it starts the next build with parameters from gitlab-ci.yml.
+3. [[ "${BUILD_STATUS}" == "SUCCESS" ]] && exit 0 || exit 1 means that if any status other than SUCCESS is received from Jenkins, the build in GitLab CI will not be successful. This will result in the Merge Request (MR) not being executed.
 #### Configuration Parameters
 
 1. **JENKINS_USER**: The Jenkins user who has permissions to execute builds.
