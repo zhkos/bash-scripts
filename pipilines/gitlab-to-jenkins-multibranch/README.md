@@ -1,33 +1,5 @@
 My script for a multi-branch pipeline in Jenkins that is triggered by GitLab and pulls a job in Jenkins
 
-# Jenkins Build Management Functions
-
-## 1. get_next_build_number
-- Retrieves the next build number for a specific job in Jenkins.
-- Uses curl to request the Jenkins API and jq to process the JSON response.
-
-## 2. get_last_build_number
-- Retrieves the last build number for the specified job.
-- Also uses curl and jq.
-
-## 3. get_build_status
-- Retrieves the status of a build by its number.
-- Returns the result of the build execution (e.g., SUCCESS, FAILURE, etc.).
-
-## 4. trigger_build_job
-- Triggers a build with specified parameters.
-- Uses the POST method to call the Jenkins API.
-
-## 5. trigger_all_build_job_indexing
-- Initiates indexing of all jobs in Jenkins.
-- Useful if it is necessary to update the state of all branches.
-
-## 6. polling_job_result
-- Polls the status of a build for a specified number of attempts.
-- If the status has not changed after the maximum number of attempts, the script exits with an error.
-
----
-
 # Configuration Parameters
 
 1. **JENKINS_USER**: The Jenkins user who has permissions to execute builds.
