@@ -1,6 +1,6 @@
 My script for a multi-branch pipeline in Jenkins that is triggered by GitLab and pulls a job in Jenkins
 
-# Configuration Parameters
+#### Configuration Parameters
 
 1. **JENKINS_USER**: The Jenkins user who has permissions to execute builds.
 2. **BUILD_TOKEN**: The authentication token used to trigger builds in Jenkins.
